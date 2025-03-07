@@ -23,6 +23,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -36,40 +39,58 @@ public class DocumentService {
 
   @Autowired private DocumentRepository documentRepository;
 
-  public Document uploadDocument(MultipartFile file, String user, List<String> tags)
-      throws Exception {
+  private static final long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
+  public ResponseEntity<String> uploadDocument(MultipartFile file, String user, List<String> tags) {
+
+    if (file.getSize() > MAX_FILE_SIZE) {
+      return new ResponseEntity<>("Too big to upload!, Max 50Mb", HttpStatus.BAD_REQUEST);
+    }
+
     String documentName = file.getOriginalFilename();
     String minioPath = user + "/" + documentName;
 
-    // Upload the file to MinIO
-    try (InputStream inputStream = file.getInputStream()) {
+    try {
+      InputStream inputStream = file.getInputStream();
       minioClient.putObject(
           PutObjectArgs.builder().bucket(bucketName).object(minioPath).stream(
                   inputStream, file.getSize(), -1)
               .contentType(file.getContentType())
               .build());
+
+      Document document = new Document();
+      document.setUserName(user);
+      document.setDocumentName(documentName);
+      document.setTags(String.join(",", tags));
+      document.setMinioPath(minioPath);
+      document.setFileSize(file.getSize());
+      document.setFileType(file.getContentType());
+      document.setCreatedAt(LocalDateTime.now());
+
+    } catch (InvalidKeyException
+        | ErrorResponseException
+        | InsufficientDataException
+        | InternalException
+        | InvalidResponseException
+        | NoSuchAlgorithmException
+        | ServerException
+        | XmlParserException
+        | IllegalArgumentException
+        | IOException e) {
+      e.printStackTrace();
     }
 
-    // Save metadata to PostgreSQL
-    Document document = new Document();
-    document.setUserName(user);
-    document.setDocumentName(documentName);
-    document.setTags(String.join(",", tags));
-    document.setMinioPath(minioPath);
-    document.setFileSize(file.getSize());
-    document.setFileType(file.getContentType());
-    document.setCreatedAt(LocalDateTime.now());
-
-    return documentRepository.save(document);
+    return new ResponseEntity<>("The documents were uploaded successfully.", HttpStatus.OK);
   }
 
-  // Method to search documents based on user, document name, and tags, with pagination support
   public Page<Document> searchDocuments(
-      String user, String documentName, String tags, int page, int size) {
-    // Create PageRequest for pagination
-    PageRequest pageRequest = PageRequest.of(page, size);
+      String user, String documentName, String tags, int page, int size, String sort) {
 
-    // Call the repository to fetch documents based on filters
+    PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Order.asc("documentName")));
+
+    if (!sort.isEmpty() && "desc".equalsIgnoreCase(sort))
+      pageRequest = PageRequest.of(page, size, Sort.by(Sort.Order.desc("documentName")));
+
     return documentRepository.findByFilters(user, documentName, tags, pageRequest);
   }
 
@@ -80,7 +101,6 @@ public class DocumentService {
             .orElseThrow(() -> new RuntimeException("Document not found"));
     String filePath = document.getMinioPath();
 
-    // Generate the presigned URL
     try {
       return minioClient.getPresignedObjectUrl(
           GetPresignedObjectUrlArgs.builder()

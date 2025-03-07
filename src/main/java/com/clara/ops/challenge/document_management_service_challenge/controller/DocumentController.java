@@ -5,6 +5,7 @@ import com.clara.ops.challenge.document_management_service_challenge.service.Doc
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -15,7 +16,7 @@ public class DocumentController {
   @Autowired private DocumentService documentService;
 
   @PostMapping("/upload")
-  public Document uploadDocument(
+  public ResponseEntity<String> uploadDocument(
       @RequestParam("file") MultipartFile file,
       @RequestParam("user") String user,
       @RequestParam("tags") List<String> tags)
@@ -29,10 +30,11 @@ public class DocumentController {
       @RequestParam(value = "documentName", required = false) String documentName,
       @RequestParam(value = "tags", required = false) String tags,
       @RequestParam(value = "page", defaultValue = "0") int page,
-      @RequestParam(value = "size", defaultValue = "10") int size) {
+      @RequestParam(value = "size", defaultValue = "10") int size,
+      @RequestParam(value = "sort", defaultValue = "asc") String sort) {
 
     // Call the service method to get filtered documents with pagination
-    return documentService.searchDocuments(user, documentName, tags, page, size);
+    return documentService.searchDocuments(user, documentName, tags, page, size, sort);
   }
 
   @GetMapping("/download/{id}")
