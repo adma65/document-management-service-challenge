@@ -43,6 +43,10 @@ public class DocumentService {
 
   public ResponseEntity<String> uploadDocument(MultipartFile file, String user, List<String> tags) {
 
+    if (file == null) {
+      return new ResponseEntity<>("File not present", HttpStatus.BAD_REQUEST);
+    }
+
     if (file.getSize() > MAX_FILE_SIZE) {
       return new ResponseEntity<>("Too big to upload!, Max 50Mb", HttpStatus.BAD_REQUEST);
     }
@@ -67,6 +71,8 @@ public class DocumentService {
       document.setFileType(file.getContentType());
       document.setCreatedAt(LocalDateTime.now());
 
+      documentRepository.save(document);
+      
     } catch (InvalidKeyException
         | ErrorResponseException
         | InsufficientDataException

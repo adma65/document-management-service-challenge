@@ -25,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
@@ -63,18 +64,18 @@ public class DocumentServiceTest {
     Document savedDocument = new Document();
     savedDocument.setUserName(user);
     savedDocument.setDocumentName(mockFile.getOriginalFilename());
-    savedDocument.setTags(tags);
+    savedDocument.setTags(String.join(",", tags));
     savedDocument.setMinioPath(user + "/" + mockFile.getOriginalFilename());
     savedDocument.setFileSize(mockFile.getSize());
     savedDocument.setFileType(mockFile.getContentType());
     savedDocument.setCreatedAt(LocalDateTime.now());
 
     when(minioClient.putObject(any(PutObjectArgs.class))).thenReturn(null);
-    when(documentService.uploadDocument(any(), any(), any()))
-        .thenReturn(new ResponseEntity<>(HttpStatus.OK));
 
+    // Act
     ResponseEntity<String> result = documentService.uploadDocument(mockFile, user, tagsList);
 
+    // Assert
     assertNotNull(result);
     assertEquals(HttpStatus.OK, result.getStatusCode());
   }
@@ -86,17 +87,32 @@ public class DocumentServiceTest {
     String tags = "tag1,tag2";
     int page = 0;
     int size = 10;
+    String sortDirection = "asc";
 
+    // Mock Page object
     Page<Document> mockPage = mock(Page.class);
 
-    when(documentRepository.findByFilters(user, documentName, tags, PageRequest.of(page, size)))
+    // Mock the repository call with sorting
+    when(documentRepository.findByFilters(
+            user,
+            documentName,
+            tags,
+            PageRequest.of(page, size, Sort.by(Sort.Order.asc("documentName")))))
         .thenReturn(mockPage);
 
+    // Call the method to test
     Page<Document> result =
-        documentService.searchDocuments(user, documentName, tags, page, size, "asc");
+        documentService.searchDocuments(user, documentName, tags, page, size, sortDirection);
 
-    verify(documentRepository).findByFilters(user, documentName, tags, PageRequest.of(page, size));
+    // Verify that the repository method is called with the correct arguments, including sorting
+    verify(documentRepository)
+        .findByFilters(
+            user,
+            documentName,
+            tags,
+            PageRequest.of(page, size, Sort.by(Sort.Order.asc("documentName"))));
 
+    // Assert that the result is not null
     assertNotNull(result, "The result should not be null");
   }
 
