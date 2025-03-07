@@ -1,3 +1,6 @@
+# 📄 Follow the config defined in the application.properties file to run successful the app, other way, replace the needed properties to get success
+
+
 # 📄 Document Management API Challenge
 
 ## Overview 🚀
