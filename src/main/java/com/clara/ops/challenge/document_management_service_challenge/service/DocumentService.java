@@ -72,7 +72,7 @@ public class DocumentService {
       document.setCreatedAt(LocalDateTime.now());
 
       documentRepository.save(document);
-      
+
     } catch (InvalidKeyException
         | ErrorResponseException
         | InsufficientDataException
